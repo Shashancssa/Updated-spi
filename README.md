@@ -33,3 +33,7 @@ CSV files are also previewed in the top SPC result grid before the external spre
 ## DB-process-only options
 
 Options that are not part of the Excel workflow, such as **Utilities**, **Other**, **ModelList**, **ListView/Report**, **PcbView**, **Histogram**, and **Defect Chart**, show a **DB Process Error** message because they require the real database process.
+
+## Application icon
+
+The GUI creates `.spc_runtime/spc_backend.ico` at runtime and uses it as the Windows title-bar/taskbar icon, so the PR contains only text files and avoids binary-file upload errors. Tkinter also applies the same icon colors directly at runtime.

@@ -1,3 +1,4 @@
 .spc_gui_config.json
 __pycache__/
 *.pyc
+.spc_runtime/

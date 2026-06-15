@@ -5,9 +5,11 @@ Run with: python3 spc_gui.py
 from __future__ import annotations
 
 import csv
+import ctypes
 import json
 import os
 import platform
+import struct
 import subprocess
 import tkinter as tk
 from pathlib import Path
@@ -16,6 +18,8 @@ from tkinter import filedialog, messagebox, ttk
 APP_TITLE = "SPC Analysis Backend"
 CONFIG_FILE = Path(".spc_gui_config.json")
 DEFAULT_SPC_EXCEL = Path("spc_backend/SPC_Backend.xlsx")
+WINDOW_ICON = Path(".spc_runtime/spc_backend.ico")
+WINDOW_APP_ID = "SPC.Analysis.Backend"
 SAMPLE_ROWS = [
     ("SPI_TRI_356_R0_(ME420079)_SS", "SPI-LINE01SPI", "4", "100%", "0%", "0", "0%", "0", "100%", "4", "0", "100%", "9"),
     ("SPI_TRI_357_R0_(ME420079)_CS", "SPI-LINE01SPI", "4", "100%", "0%", "0", "0%", "0", "100%", "4", "0", "100%", "0"),
@@ -49,7 +53,12 @@ class SPCReplica(tk.Tk):
         self._build_ui()
 
     def _set_window_icon(self) -> None:
-        """Create a small in-memory SPC icon for the application window."""
+        """Set the same SPC icon for the title bar and Windows taskbar/app switcher."""
+        if platform.system() == "Windows":
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(WINDOW_APP_ID)
+            icon_path = self._ensure_window_icon_file()
+            self.iconbitmap(default=str(icon_path))
+
         icon = tk.PhotoImage(width=32, height=32)
         icon.put("#1d6fa5", to=(0, 0, 32, 32))
         icon.put("#d7e8fb", to=(3, 3, 29, 29))
@@ -59,6 +68,40 @@ class SPCReplica(tk.Tk):
         icon.put("#27ae60", to=(21, 6, 26, 22))
         self.iconphoto(True, icon)
         self._icon_image = icon
+
+    def _ensure_window_icon_file(self) -> Path:
+        """Create the Windows .ico file at runtime so the PR contains no binary files."""
+        if WINDOW_ICON.exists():
+            return WINDOW_ICON
+        WINDOW_ICON.parent.mkdir(exist_ok=True)
+        size = 32
+        pixels = []
+        for y in range(size):
+            for x in range(size):
+                color = (0x1D, 0x6F, 0xA5)
+                if 3 <= x < 29 and 3 <= y < 29:
+                    color = (0xD7, 0xE8, 0xFB)
+                if 5 <= x < 27 and 22 <= y < 25:
+                    color = (0x1D, 0x6F, 0xA5)
+                if 7 <= x < 12 and 15 <= y < 22:
+                    color = (0xFF, 0xB3, 0x47)
+                if 14 <= x < 19 and 10 <= y < 22:
+                    color = (0x2F, 0x80, 0xED)
+                if 21 <= x < 26 and 6 <= y < 22:
+                    color = (0x27, 0xAE, 0x60)
+                pixels.append(color)
+
+        bitmap = struct.pack("<IIIHHIIIIII", 40, size, size * 2, 1, 32, 0, size * size * 4, 0, 0, 0, 0)
+        for y in range(size - 1, -1, -1):
+            for x in range(size):
+                red, green, blue = pixels[y * size + x]
+                bitmap += bytes([blue, green, red, 255])
+        bitmap += bytes(size * 4)
+
+        icon_header = struct.pack("<HHH", 0, 1, 1)
+        icon_directory = struct.pack("<BBBBHHII", size, size, 0, 0, 1, 32, len(bitmap), 22)
+        WINDOW_ICON.write_bytes(icon_header + icon_directory + bitmap)
+        return WINDOW_ICON
 
     def _load_configured_excel_path(self) -> Path:
         """Return the linked SPC workbook path saved by the operator, or the default path."""
