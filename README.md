@@ -32,8 +32,12 @@ CSV files are also previewed in the top SPC result grid before the external spre
 
 ## DB-process-only options
 
-Options that are not part of the Excel workflow, such as **Utilities**, **Other**, **ModelList**, **ListView/Report**, **PcbView**, **Histogram**, and **Defect Chart**, show a **DB Process Error** message because they require the real database process.
+Options that are not part of the Excel workflow, such as **Utilities**, **Other**, **ModelList**, **ListView/Report**, **Histogram**, and **Defect Chart**, show a **DB Process Error** message because they require the real database process.
 
 ## Application icon
 
 The GUI creates `.spc_runtime/spc_backend.ico` at runtime and uses it as the Windows title-bar/taskbar icon, so the PR contains only text files and avoids binary-file upload errors. Tkinter also applies the same green icon colors directly at runtime.
+
+## PCB View window
+
+Click **PcbView** in the ribbon to open a separate PCB View window matching the supplied inspection screen. The PCB View includes editable filter fields, editable panel-information entries, an editable defect grid, an inspection-board drawing, right-side analysis plots, and an editable actual-test-data grid.

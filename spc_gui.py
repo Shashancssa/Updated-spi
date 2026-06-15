@@ -158,7 +158,7 @@ class SPCReplica(tk.Tk):
         tools = [
             ("🔍", "ModelList", self._noop),
             ("▤", "ListView/Report", self._noop),
-            ("▦", "PcbView", self._noop),
+            ("▦", "PcbView", self.open_pcb_view),
             ("▥", "Histogram", self._noop),
             ("📊", "Defect\nChart", self._noop),
             ("📁", "Link SPC\nExcel", self.choose_spc_excel_link),
@@ -345,6 +345,194 @@ class SPCReplica(tk.Tk):
         for row in rows[1:]:
             padded = (row + [""] * len(headers))[: len(headers)]
             self.grid.insert("", "end", values=padded)
+
+    def open_pcb_view(self) -> None:
+        """Open the PCB View replica window with editable inspection fields."""
+        win = tk.Toplevel(self)
+        win.title("SPC Analysis - PCB View")
+        win.geometry("1366x720")
+        win.minsize(1100, 620)
+        win.configure(bg="#dfeaf8")
+        win.transient(self)
+
+        ribbon = tk.Frame(win, height=70, bg="#c6ddf5", highlightthickness=1, highlightbackground="#94b7d8")
+        ribbon.pack(fill="x")
+        for icon, label in (("🔍", "ModelList"), ("▤", "ListView/Report"), ("▦", "PcbView"), ("▥", "Histogram"), ("📊", "Defect\nChart"), ("〰", "DefectSPC")):
+            item = tk.Frame(ribbon, width=78, height=68, bg="#c6ddf5", highlightbackground="#aac4de", highlightthickness=1)
+            item.pack(side="left", padx=1, pady=2)
+            item.pack_propagate(False)
+            tk.Label(item, text=icon, bg="#c6ddf5", font=("Segoe UI", 18)).pack(pady=(4, 0))
+            tk.Label(item, text=label, bg="#c6ddf5", fg="#163d5c", font=("Segoe UI", 8)).pack()
+
+        middle = tk.Frame(win, bg="#dfeaf8")
+        middle.pack(fill="both", expand=True)
+        left = tk.Frame(middle, width=260, bg="#dce9f8", highlightbackground="#9fbdda", highlightthickness=1)
+        left.pack(side="left", fill="y", padx=(2, 3), pady=3)
+        left.pack_propagate(False)
+        center = tk.Frame(middle, bg="black")
+        center.pack(side="left", fill="both", expand=True, pady=3)
+        right = tk.Frame(middle, width=225, bg="#eef5ff", highlightbackground="#9fbdda", highlightthickness=1)
+        right.pack(side="right", fill="y", padx=(3, 2), pady=3)
+        right.pack_propagate(False)
+
+        self._build_pcb_filter_panel(left)
+        self._build_pcb_canvas(center)
+        self._build_pcb_analysis_panel(right)
+        self._build_pcb_data_grid(win)
+
+    def _build_pcb_filter_panel(self, parent: tk.Frame) -> None:
+        filter_box = ttk.LabelFrame(parent, text="Data Filter:", style="Panel.TLabelframe")
+        filter_box.pack(fill="x", padx=6, pady=4)
+        tk.Label(filter_box, text="Filter Type:", bg="#dfeaf8").grid(row=0, column=0, sticky="w", padx=5, pady=3)
+        filter_type = ttk.Combobox(filter_box, values=("*", "Volume", "Area", "Height"), width=12)
+        filter_type.set("*")
+        filter_type.grid(row=0, column=1, padx=4, pady=3)
+        tk.Checkbutton(filter_box, text="Analysis", bg="#dfeaf8").grid(row=0, column=2, sticky="w")
+        metric = ttk.Combobox(filter_box, values=("Volume", "Area", "Height"), width=9)
+        metric.set("Volume")
+        metric.grid(row=1, column=0, padx=5, pady=3)
+        for row, sign, value in ((1, ">", "0"), (2, "<", "100")):
+            op = ttk.Combobox(filter_box, values=(">", "<", "="), width=3)
+            op.set(sign)
+            op.grid(row=row, column=1, sticky="w", padx=4)
+            entry = ttk.Entry(filter_box, width=8)
+            entry.insert(0, value)
+            entry.grid(row=row, column=1, sticky="e", padx=4)
+        ttk.Button(filter_box, text="🔎 QUERY", style="Blue.TButton").grid(row=1, column=2, rowspan=2, padx=8, pady=6, sticky="nsew")
+
+        info = ttk.LabelFrame(parent, text="Panel Info:", style="Panel.TLabelframe")
+        info.pack(fill="x", padx=6, pady=4)
+        values = (
+            ("Board Status:", "RPASS"),
+            ("Model Name:", "SPI_TRI_356_R0_(ME420079)_SS"),
+            ("Inspect Time:", "2026/06/03 20:48:54"),
+            ("Barcode:", "4P540010436261G0006"),
+            ("TotalPad:", "2292"),
+            ("Station:", "LINE01SPI"),
+        )
+        for row, (label, value) in enumerate(values):
+            tk.Label(info, text=label, bg="#dfeaf8").grid(row=row, column=0, sticky="w", padx=4, pady=3)
+            entry = ttk.Entry(info, width=24)
+            entry.insert(0, value)
+            entry.grid(row=row, column=1, sticky="ew", padx=4, pady=3)
+
+        defect = ttk.LabelFrame(parent, text="Defect", style="Panel.TLabelframe")
+        defect.pack(fill="both", expand=True, padx=6, pady=4)
+        defect_grid = ttk.Treeview(defect, columns=("Result", "Count"), show="headings", height=6)
+        for col in defect_grid["columns"]:
+            defect_grid.heading(col, text=col)
+            defect_grid.column(col, width=110 if col == "Result" else 55)
+        for row in (("Over Height", "4"), ("PASS", "2288"), ("DefectCount", "4")):
+            defect_grid.insert("", "end", values=row)
+        defect_grid.pack(fill="both", expand=True, padx=4, pady=4)
+        self._make_tree_editable(defect_grid)
+        buttons = tk.Frame(parent, bg="#dce9f8")
+        buttons.pack(fill="x", padx=6, pady=5)
+        for text in ("🔍 To Condition", "📗 Report", "▰ Warpage"):
+            ttk.Button(buttons, text=text, style="Blue.TButton").pack(side="left", expand=True, fill="x", padx=2)
+
+    def _build_pcb_canvas(self, parent: tk.Frame) -> None:
+        canvas = tk.Canvas(parent, bg="black", highlightthickness=0)
+        canvas.pack(fill="both", expand=True)
+
+        def draw(_event: tk.Event | None = None) -> None:
+            canvas.delete("all")
+            width = max(canvas.winfo_width(), 700)
+            height = max(canvas.winfo_height(), 430)
+            board_w = min(520, width - 220)
+            board_h = height - 30
+            x0 = (width - board_w) // 2
+            y0 = 0
+            canvas.create_rectangle(x0, y0, x0 + board_w, y0 + board_h, fill="#008b13", outline="#008b13")
+            cell_w = board_w / 3
+            cell_h = board_h / 2
+            for row in range(2):
+                for col in range(3):
+                    ox = x0 + col * cell_w + 20
+                    oy = y0 + row * cell_h + 20
+                    self._draw_board_cell(canvas, ox, oy, cell_w - 35, cell_h - 35)
+            canvas.create_text(5, height - 18, anchor="w", text="Current Zoom1", fill="black", font=("Segoe UI", 9, "bold"))
+            for i, symbol in enumerate(("↔", "✣", "↖", "↗", "↙", "↘", "🔍")):
+                canvas.create_rectangle(95 + i * 28, height - 32, 120 + i * 28, height - 7, fill="#e9f3ff", outline="#7fa8c8")
+                canvas.create_text(107 + i * 28, height - 20, text=symbol, fill="#1c3f5d", font=("Segoe UI", 10))
+
+        canvas.bind("<Configure>", draw)
+        canvas.after(100, draw)
+
+    def _draw_board_cell(self, canvas: tk.Canvas, x: float, y: float, width: float, height: float) -> None:
+        for i in range(10):
+            px = x + 8 + (i % 5) * 12
+            py = y + 8 + (i // 5) * 12
+            canvas.create_rectangle(px, py, px + 4, py + 4, outline="white")
+        for i in range(55):
+            px = x + 70 + (i * 17 % int(width - 90))
+            py = y + 22 + (i * 29 % int(height - 55))
+            size = 3 + (i % 3)
+            canvas.create_rectangle(px, py, px + size, py + size, outline="white")
+        for i in range(5):
+            canvas.create_rectangle(x + 16 + i * 24, y + height - 36, x + 28 + i * 24, y + height - 22, outline="white")
+        canvas.create_rectangle(x + width / 2 - 18, y + height - 55, x + width / 2 + 18, y + height - 18, outline="white", width=2)
+        for i in range(10):
+            canvas.create_rectangle(x + width / 2 - 25, y + height - 52 + i * 3, x + width / 2 - 20, y + height - 50 + i * 3, outline="white")
+            canvas.create_rectangle(x + width / 2 + 20, y + height - 52 + i * 3, x + width / 2 + 25, y + height - 50 + i * 3, outline="white")
+
+    def _build_pcb_analysis_panel(self, parent: tk.Frame) -> None:
+        kind = ttk.LabelFrame(parent, text="Kind", style="Panel.TLabelframe")
+        kind.pack(fill="x", padx=6, pady=4)
+        for text in ("Volume(%)", "Area(%)", "Height"):
+            tk.Radiobutton(kind, text=text, bg="#eef5ff", value=text).pack(side="left", padx=2)
+        hist = tk.Canvas(parent, height=135, bg="white", highlightbackground="#808080", highlightthickness=1)
+        hist.pack(fill="x", padx=10, pady=6)
+        for x in range(15, 210, 12):
+            hist.create_rectangle(x, 10, x + 4, 125, fill="yellow", outline="yellow")
+        points = [70, 74, 76, 79, 84, 87, 88, 92, 94, 97, 100, 104, 108, 110, 114]
+        for i, x in enumerate(points):
+            y = 120 - (i * 7 % 85)
+            hist.create_line(x, 120, x + 3, y, fill="black", width=3)
+        scatter = tk.Canvas(parent, height=110, bg="white", highlightbackground="#808080", highlightthickness=1)
+        scatter.pack(fill="x", padx=25, pady=14)
+        scatter.create_line(10, 55, 195, 55)
+        scatter.create_line(102, 10, 102, 100)
+        for i in range(180):
+            x = 102 + ((i * 37) % 70) - 35
+            y = 55 + ((i * 23) % 46) - 23
+            scatter.create_oval(x, y, x + 1, y + 1, fill="black")
+        ttk.Combobox(parent, values=("Height CP/CPK",), width=25).pack(fill="x", padx=10, pady=5)
+        tk.Checkbutton(parent, text="ColorCadMap", bg="#eef5ff").pack(anchor="w", padx=10)
+        ttk.Button(parent, text="📁 Show Image", style="Blue.TButton").pack(padx=45, pady=8, fill="x")
+        nav = tk.Frame(parent, bg="#eef5ff")
+        nav.pack(fill="x", padx=8, pady=6)
+        ttk.Button(nav, text="◀ Prior", style="Blue.TButton", state="disabled").pack(side="left", expand=True, fill="x")
+        tk.Label(nav, text="1/1", bg="#eef5ff").pack(side="left", padx=8)
+        ttk.Button(nav, text="Next ▶", style="Blue.TButton", state="disabled").pack(side="left", expand=True, fill="x")
+
+    def _build_pcb_data_grid(self, parent: tk.Toplevel) -> None:
+        bottom = tk.Frame(parent, height=175, bg="#dce9f8", highlightbackground="#9fbdda", highlightthickness=1)
+        bottom.pack(fill="x", side="bottom")
+        columns = ("winname", "V%", "A%", "H", "PX", "PY", "CircumRatio", "H%", "Boardsn", "Vhigh(%)", "Vstd(%)", "Vlow(%)")
+        data_grid = ttk.Treeview(bottom, columns=columns, show="headings", height=7)
+        data_grid.pack(fill="x", padx=45, pady=(8, 0))
+        for col in columns:
+            data_grid.heading(col, text=col)
+            data_grid.column(col, width=90 if col != "Boardsn" else 150)
+        rows = (
+            ("1", "152.19", "101.88", "5.9764", "-1.1654", "3.9606", "0", "149.38", "4P540010436261G0002", "180", "100", "60"),
+            ("1", "124.53", "83.1", "5.9961", "0.2835", "2.0591", "0", "149.85", "4P540010436261G0003", "180", "100", "60"),
+            ("2", "146.45", "97.55", "6.0039", "-0.4213", "0.8898", "0", "150.13", "4P540010436261G0005", "180", "100", "60"),
+            ("2", "132.7", "86.34", "6.1457", "0.2087", "2.1969", "0", "153.69", "4P540010436261G0001", "180", "100", "60"),
+        )
+        for row in rows:
+            data_grid.insert("", "end", values=row)
+        self._make_tree_editable(data_grid)
+        summary = tk.Frame(bottom, bg="#dce9f8")
+        summary.pack(fill="x", padx=580, pady=5)
+        for values in (("AVG=118.65", "AVG=99.50", "AVG=4.77", "AVG=0.02", "AVG=0.46"), ("MAX=152.19", "MAX=113.75", "MAX=6.15", "MAX=5.28", "MAX=6.85"), ("MIN=76.14", "MIN=69.97", "MIN=3.24", "MIN=-3.09", "MIN=-4.39")):
+            row_frame = tk.Frame(summary, bg="#dce9f8")
+            row_frame.pack(fill="x")
+            for value in values:
+                entry = ttk.Entry(row_frame, width=14)
+                entry.insert(0, value)
+                entry.pack(side="left", padx=2, pady=1)
 
     def _db_process_error(self, option: str = "Selected option") -> None:
         messagebox.showerror("DB Process Error", f"{option} requires the DB process and is not available in this replica.")
