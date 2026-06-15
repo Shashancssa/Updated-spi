@@ -15,11 +15,11 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-APP_TITLE = "SPC Analysis Backend"
+APP_TITLE = "SPC Analysis"
 CONFIG_FILE = Path(".spc_gui_config.json")
 DEFAULT_SPC_EXCEL = Path("spc_backend/SPC_Backend.xlsx")
 WINDOW_ICON = Path(".spc_runtime/spc_backend.ico")
-WINDOW_APP_ID = "SPC.Analysis.Backend"
+WINDOW_APP_ID = "SPC.Analysis"
 SAMPLE_ROWS = [
     ("SPI_TRI_356_R0_(ME420079)_SS", "SPI-LINE01SPI", "4", "100%", "0%", "0", "0%", "0", "100%", "4", "0", "100%", "9"),
     ("SPI_TRI_357_R0_(ME420079)_CS", "SPI-LINE01SPI", "4", "100%", "0%", "0", "0%", "0", "100%", "4", "0", "100%", "0"),
@@ -63,7 +63,7 @@ class SPCReplica(tk.Tk):
         icon.put("#1d6fa5", to=(0, 0, 32, 32))
         icon.put("#d7e8fb", to=(3, 3, 29, 29))
         icon.put("#1d6fa5", to=(5, 22, 27, 25))
-        icon.put("#ffb347", to=(7, 15, 12, 22))
+        icon.put("#27ae60", to=(7, 15, 12, 22))
         icon.put("#2f80ed", to=(14, 10, 19, 22))
         icon.put("#27ae60", to=(21, 6, 26, 22))
         self.iconphoto(True, icon)
@@ -84,7 +84,7 @@ class SPCReplica(tk.Tk):
                 if 5 <= x < 27 and 22 <= y < 25:
                     color = (0x1D, 0x6F, 0xA5)
                 if 7 <= x < 12 and 15 <= y < 22:
-                    color = (0xFF, 0xB3, 0x47)
+                    color = (0x27, 0xAE, 0x60)
                 if 14 <= x < 19 and 10 <= y < 22:
                     color = (0x2F, 0x80, 0xED)
                 if 21 <= x < 26 and 6 <= y < 22:
@@ -141,7 +141,7 @@ class SPCReplica(tk.Tk):
     def _build_title_bar(self) -> None:
         bar = tk.Frame(self, height=28, bg="#d7e8fb", highlightthickness=1, highlightbackground="#a7c0df")
         bar.pack(fill="x")
-        tk.Label(bar, text="⚙", bg="#ffd65a", fg="#b87400", font=("Segoe UI", 14), width=3).pack(side="left", padx=(3, 12), pady=3)
+        tk.Label(bar, text="⚙", bg="#9be7b0", fg="#0b6b2b", font=("Segoe UI", 14), width=3).pack(side="left", padx=(3, 12), pady=3)
 
     def _build_ribbon(self) -> None:
         tabs = tk.Frame(self, bg="#b8d5f0")
@@ -281,7 +281,7 @@ class SPCReplica(tk.Tk):
             c.create_text(left - 18, y, text=str(i), font=("Segoe UI", 8))
         groups = [left + (right - left) * .28, left + (right - left) * .78]
         labels = ["LINE01SPI/SPI_TRI_356_R0_(ME420079)_SS", "LINE01SPI/SPI_TRI_357_R0_(ME420079)_CS"]
-        colors = [("green", 0), ("red", 0), ("#ff7f00", 100), ("blue", 100)]
+        colors = [("green", 0), ("red", 0), ("#00a651", 100), ("blue", 100)]
         for x, label in zip(groups, labels):
             c.create_text(x, bottom + 20, text=label, font=("Segoe UI", 8))
             for j, (color, val) in enumerate(colors):
@@ -289,7 +289,7 @@ class SPCReplica(tk.Tk):
                 x0 = x - 55 + j * 35
                 c.create_rectangle(x0, bottom - bar_h, x0 + 35, bottom, fill=color, outline=color)
                 c.create_text(x0 + 17, bottom - bar_h - 16, text=str(val), font=("Segoe UI", 8))
-        for k, (name, color) in enumerate((("PassRate", "green"), ("FailRate", "red"), ("FalseAlarmRate", "#ff7f00"), ("YieldRate", "blue"))):
+        for k, (name, color) in enumerate((("PassRate", "green"), ("FailRate", "red"), ("FalseAlarmRate", "#00a651"), ("YieldRate", "blue"))):
             y = 52 + k * 18
             c.create_rectangle(right + 20, y - 7, right + 30, y + 3, fill=color)
             c.create_text(right + 38, y, text=name, anchor="w", font=("Segoe UI", 8))
@@ -299,7 +299,7 @@ class SPCReplica(tk.Tk):
         status.pack(fill="x", side="bottom")
         self.status_left = tk.Label(status, text=f"Linked SPC Excel: {self.spc_excel_path}", bg="#d7e8fb", fg="#173d5c", anchor="w")
         self.status_left.pack(side="left", padx=8)
-        tk.Label(status, text="SPC Backend", bg="#d7e8fb", fg="#173d5c", anchor="e").pack(side="right", padx=8)
+        tk.Label(status, text="SPC Analysis", bg="#d7e8fb", fg="#173d5c", anchor="e").pack(side="right", padx=8)
 
     def choose_spc_excel_link(self) -> None:
         """Let the operator link the exact workbook that the SPC button should open."""
@@ -311,14 +311,14 @@ class SPCReplica(tk.Tk):
         self._save_configured_excel_path(self.spc_excel_path)
         if hasattr(self, "status_left"):
             self.status_left.configure(text=f"Linked SPC Excel: {self.spc_excel_path}")
-        messagebox.showinfo("SPC Backend", f"SPC option linked to:\n{self.spc_excel_path}")
+        messagebox.showinfo("SPC Analysis", f"SPC option linked to:\n{self.spc_excel_path}")
 
     def open_linked_spc_excel(self) -> None:
         """Open the linked workbook directly when the SPC option is clicked."""
         path = self.spc_excel_path
         if not path.exists():
             messagebox.showwarning(
-                "SPC Backend",
+                "SPC Analysis",
                 "No linked SPC Excel workbook was found.\n\n"
                 f"Place your workbook here:\n{DEFAULT_SPC_EXCEL}\n\n"
                 "Or click 'Link SPC Excel' / 'Link File' to choose the workbook once.",
@@ -329,9 +329,9 @@ class SPCReplica(tk.Tk):
             self._load_csv_preview(path)
         try:
             open_with_default_app(path)
-            messagebox.showinfo("SPC Backend", f"Linked SPC Excel opened:\n{path}")
+            messagebox.showinfo("SPC Analysis", f"Linked SPC Excel opened:\n{path}")
         except Exception as exc:  # noqa: BLE001 - display OS integration failures to the operator.
-            messagebox.showwarning("SPC Backend", f"Linked file:\n{path}\n\nCould not open it automatically: {exc}")
+            messagebox.showwarning("SPC Analysis", f"Linked file:\n{path}\n\nCould not open it automatically: {exc}")
 
     def _load_csv_preview(self, path: Path) -> None:
         with path.open(newline="", encoding="utf-8-sig") as handle:

@@ -1,4 +1,4 @@
-# SPC GUI Replica
+# SPC Analysis GUI Replica
 
 A standalone Tkinter desktop application that recreates the supplied SPC analysis screen and wires the **DefectSPC** / **SPC Excel** actions to a linked backend Excel workbook.
 
@@ -36,4 +36,4 @@ Options that are not part of the Excel workflow, such as **Utilities**, **Other*
 
 ## Application icon
 
-The GUI creates `.spc_runtime/spc_backend.ico` at runtime and uses it as the Windows title-bar/taskbar icon, so the PR contains only text files and avoids binary-file upload errors. Tkinter also applies the same icon colors directly at runtime.
+The GUI creates `.spc_runtime/spc_backend.ico` at runtime and uses it as the Windows title-bar/taskbar icon, so the PR contains only text files and avoids binary-file upload errors. Tkinter also applies the same green icon colors directly at runtime.
