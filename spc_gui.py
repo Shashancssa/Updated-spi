@@ -5,6 +5,7 @@ Run with: python3 spc_gui.py
 from __future__ import annotations
 
 import csv
+import json
 import os
 import platform
 import subprocess
@@ -13,6 +14,8 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 APP_TITLE = "SPC Analysis Backend"
+CONFIG_FILE = Path(".spc_gui_config.json")
+DEFAULT_SPC_EXCEL = Path("spc_backend/SPC_Backend.xlsx")
 SAMPLE_ROWS = [
     ("SPI_TRI_356_R0_(ME420079)_SS", "SPI-LINE01SPI", "4", "100%", "0%", "0", "0%", "0", "100%", "4", "0", "100%", "9"),
     ("SPI_TRI_357_R0_(ME420079)_CS", "SPI-LINE01SPI", "4", "100%", "0%", "0", "0%", "0", "100%", "4", "0", "100%", "0"),
@@ -40,8 +43,37 @@ class SPCReplica(tk.Tk):
         self.minsize(1100, 650)
         self.configure(bg="#dfeaf8")
         self.loaded_excel: Path | None = None
+        self.spc_excel_path = self._load_configured_excel_path()
         self._build_styles()
+        self._set_window_icon()
         self._build_ui()
+
+    def _set_window_icon(self) -> None:
+        """Create a small in-memory SPC icon for the application window."""
+        icon = tk.PhotoImage(width=32, height=32)
+        icon.put("#1d6fa5", to=(0, 0, 32, 32))
+        icon.put("#d7e8fb", to=(3, 3, 29, 29))
+        icon.put("#1d6fa5", to=(5, 22, 27, 25))
+        icon.put("#ffb347", to=(7, 15, 12, 22))
+        icon.put("#2f80ed", to=(14, 10, 19, 22))
+        icon.put("#27ae60", to=(21, 6, 26, 22))
+        self.iconphoto(True, icon)
+        self._icon_image = icon
+
+    def _load_configured_excel_path(self) -> Path:
+        """Return the linked SPC workbook path saved by the operator, or the default path."""
+        if CONFIG_FILE.exists():
+            try:
+                data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+                configured = data.get("spc_excel_path")
+                if configured:
+                    return Path(configured).expanduser()
+            except json.JSONDecodeError:
+                pass
+        return DEFAULT_SPC_EXCEL
+
+    def _save_configured_excel_path(self, path: Path) -> None:
+        CONFIG_FILE.write_text(json.dumps({"spc_excel_path": str(path)}, indent=2), encoding="utf-8")
 
     def _build_styles(self) -> None:
         style = ttk.Style(self)
@@ -83,7 +115,8 @@ class SPCReplica(tk.Tk):
             ("▦", "PcbView", self._noop),
             ("▥", "Histogram", self._noop),
             ("📊", "Defect\nChart", self._noop),
-            ("〰", "DefectSPC", self.load_excel_backend),
+            ("📁", "Link SPC\nExcel", self.choose_spc_excel_link),
+            ("〰", "DefectSPC", self.open_linked_spc_excel),
         ]
         for icon, label, command in tools:
             box = tk.Frame(ribbon, width=78, height=90, bg="#c6ddf5", highlightbackground="#aac4de", highlightthickness=1)
@@ -111,7 +144,8 @@ class SPCReplica(tk.Tk):
         for i, p in enumerate(("1 Hour", "8 Hour", "1 Day", "2 Day", "Week", "Month")):
             ttk.Button(lf, text=p, style="Blue.TButton").grid(row=3, column=i % 4, padx=2, pady=4, sticky="ew")
         ttk.Button(lf, text="🔎 Query", style="Blue.TButton", state="disabled").grid(row=4, column=2, columnspan=2, sticky="ew", padx=5, pady=22)
-        ttk.Button(lf, text="📗 Excel", style="Blue.TButton", command=self.load_excel_backend).grid(row=5, column=2, columnspan=2, sticky="ew", padx=5, pady=0)
+        ttk.Button(lf, text="📗 SPC Excel", style="Blue.TButton", command=self.open_linked_spc_excel).grid(row=5, column=2, columnspan=2, sticky="ew", padx=5, pady=0)
+        ttk.Button(lf, text="🔗 Link File", style="Blue.TButton", command=self.choose_spc_excel_link).grid(row=5, column=0, columnspan=2, sticky="ew", padx=5, pady=0)
         tk.Checkbutton(lf, text="Select Condition", bg="#dfeaf8", variable=tk.BooleanVar(value=True)).grid(row=6, column=0, columnspan=2, sticky="w", pady=18)
         for idx, (lab, val) in enumerate((("Type", "By Model"), ("Mode", "By Panel"), ("PCS", "NONE"), ("LotNo", "*")), start=7):
             tk.Label(lf, text=lab, bg="#dfeaf8").grid(row=idx, column=0, sticky="w", padx=8, pady=4)
@@ -176,24 +210,41 @@ class SPCReplica(tk.Tk):
     def _build_status_bar(self) -> None:
         status = tk.Frame(self, height=22, bg="#d7e8fb", highlightthickness=1, highlightbackground="#a7c0df")
         status.pack(fill="x", side="bottom")
-        tk.Label(status, text="Ready", bg="#d7e8fb", fg="#173d5c", anchor="w").pack(side="left", padx=8)
+        self.status_left = tk.Label(status, text=f"Linked SPC Excel: {self.spc_excel_path}", bg="#d7e8fb", fg="#173d5c", anchor="w")
+        self.status_left.pack(side="left", padx=8)
         tk.Label(status, text="SPC Backend", bg="#d7e8fb", fg="#173d5c", anchor="e").pack(side="right", padx=8)
 
-    def load_excel_backend(self) -> None:
-        """SPC backend action: choose an Excel file and open it in the default spreadsheet app."""
+    def choose_spc_excel_link(self) -> None:
+        """Let the operator link the exact workbook that the SPC button should open."""
         filetypes = [("Excel workbooks", "*.xlsx *.xls *.xlsm *.csv"), ("All files", "*.*")]
-        filename = filedialog.askopenfilename(title="Open SPC backend Excel file", filetypes=filetypes)
+        filename = filedialog.askopenfilename(title="Link SPC Excel workbook", filetypes=filetypes)
         if not filename:
             return
-        path = Path(filename)
+        self.spc_excel_path = Path(filename)
+        self._save_configured_excel_path(self.spc_excel_path)
+        if hasattr(self, "status_left"):
+            self.status_left.configure(text=f"Linked SPC Excel: {self.spc_excel_path}")
+        messagebox.showinfo("SPC Backend", f"SPC option linked to:\n{self.spc_excel_path}")
+
+    def open_linked_spc_excel(self) -> None:
+        """Open the linked workbook directly when the SPC option is clicked."""
+        path = self.spc_excel_path
+        if not path.exists():
+            messagebox.showwarning(
+                "SPC Backend",
+                "No linked SPC Excel workbook was found.\n\n"
+                f"Place your workbook here:\n{DEFAULT_SPC_EXCEL}\n\n"
+                "Or click 'Link SPC Excel' / 'Link File' to choose the workbook once.",
+            )
+            return
         self.loaded_excel = path
         if path.suffix.lower() == ".csv":
             self._load_csv_preview(path)
         try:
             open_with_default_app(path)
-            messagebox.showinfo("SPC Backend", f"Excel file opened:\n{path}")
+            messagebox.showinfo("SPC Backend", f"Linked SPC Excel opened:\n{path}")
         except Exception as exc:  # noqa: BLE001 - display OS integration failures to the operator.
-            messagebox.showwarning("SPC Backend", f"Selected file:\n{path}\n\nCould not open it automatically: {exc}")
+            messagebox.showwarning("SPC Backend", f"Linked file:\n{path}\n\nCould not open it automatically: {exc}")
 
     def _load_csv_preview(self, path: Path) -> None:
         with path.open(newline="", encoding="utf-8-sig") as handle:
