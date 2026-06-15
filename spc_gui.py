@@ -105,7 +105,10 @@ class SPCReplica(tk.Tk):
         tabs.pack(fill="x")
         for i, name in enumerate(("PCB", "Utilities", "Other")):
             bg = "#d7e8fb" if i == 0 else "#b8d5f0"
-            tk.Label(tabs, text=name, bg=bg, fg="#143856", padx=18, pady=8, relief="ridge" if i == 0 else "flat").pack(side="left")
+            tab = tk.Label(tabs, text=name, bg=bg, fg="#143856", padx=18, pady=8, relief="ridge" if i == 0 else "flat")
+            tab.pack(side="left")
+            if name != "PCB":
+                tab.bind("<Button-1>", lambda _event, option=name: self._db_process_error(option))
 
         ribbon = tk.Frame(self, height=92, bg="#c6ddf5", highlightthickness=1, highlightbackground="#94b7d8")
         ribbon.pack(fill="x")
@@ -152,13 +155,14 @@ class SPCReplica(tk.Tk):
             combo = ttk.Combobox(lf, values=[val], width=35)
             combo.set(val)
             combo.grid(row=idx, column=1, columnspan=3, sticky="ew", pady=4)
-        small = ttk.Treeview(lf, columns=("Tester", "Model", "StationID", "Lotno", "Modifie"), show="headings", height=3)
-        for col in small["columns"]:
-            small.heading(col, text=col)
-            small.column(col, width=60)
-        small.grid(row=11, column=0, columnspan=4, sticky="ew", padx=8, pady=20)
+        self.condition_grid = ttk.Treeview(lf, columns=("Tester", "Model", "StationID", "Lotno", "Modifie"), show="headings", height=3)
+        for col in self.condition_grid["columns"]:
+            self.condition_grid.heading(col, text=col)
+            self.condition_grid.column(col, width=60)
+        self.condition_grid.grid(row=11, column=0, columnspan=4, sticky="ew", padx=8, pady=20)
         for row in SAMPLE_ROWS:
-            small.insert("", "end", values=("SPI", row[0][:20], "LINE01SPI", "*", "*"))
+            self.condition_grid.insert("", "end", values=("SPI", row[0][:20], "LINE01SPI", "*", "*"))
+        self._make_tree_editable(self.condition_grid)
         ttk.Button(lf, text="Refresh", style="Blue.TButton").grid(row=12, column=0, columnspan=2, sticky="ew", padx=8)
         ttk.Button(lf, text="Apply", style="Blue.TButton").grid(row=12, column=2, columnspan=2, sticky="ew", padx=8)
 
@@ -174,9 +178,49 @@ class SPCReplica(tk.Tk):
         for i, row in enumerate(SAMPLE_ROWS):
             self.grid.insert("", "end", values=row, tags=("selected",) if i == 1 else ())
         self.grid.tag_configure("selected", background="#6d8dd8", foreground="white")
+        self._make_tree_editable(self.grid)
         self.chart = tk.Canvas(main, bg="white", highlightthickness=1, highlightbackground="#707070")
         self.chart.pack(fill="both", expand=True, padx=60, pady=8)
         self._draw_chart()
+
+    def _make_tree_editable(self, tree: ttk.Treeview) -> None:
+        """Allow operators to edit Model, StationID, LotNo, and other visible grid fields."""
+        tree.bind("<Double-1>", lambda event, target=tree: self._start_tree_cell_edit(event, target))
+
+    def _start_tree_cell_edit(self, event: tk.Event, tree: ttk.Treeview) -> None:
+        row_id = tree.identify_row(event.y)
+        column_id = tree.identify_column(event.x)
+        if not row_id or not column_id:
+            return
+        column_index = int(column_id.replace("#", "")) - 1
+        bbox = tree.bbox(row_id, column_id)
+        if not bbox:
+            return
+        x, y, width, height = bbox
+        values = list(tree.item(row_id, "values"))
+        current_value = values[column_index] if column_index < len(values) else ""
+        editor = ttk.Entry(tree)
+        editor.insert(0, current_value)
+        editor.select_range(0, "end")
+        editor.focus_set()
+        editor.place(x=x, y=y, width=width, height=height)
+
+        def save_edit(_event: tk.Event | None = None) -> None:
+            if not editor.winfo_exists():
+                return
+            while column_index >= len(values):
+                values.append("")
+            values[column_index] = editor.get()
+            tree.item(row_id, values=values)
+            editor.destroy()
+
+        def cancel_edit(_event: tk.Event | None = None) -> None:
+            if editor.winfo_exists():
+                editor.destroy()
+
+        editor.bind("<Return>", save_edit)
+        editor.bind("<FocusOut>", save_edit)
+        editor.bind("<Escape>", cancel_edit)
 
     def _draw_chart(self) -> None:
         self.chart.bind("<Configure>", lambda _event: self._render_chart())
@@ -259,8 +303,11 @@ class SPCReplica(tk.Tk):
             padded = (row + [""] * len(headers))[: len(headers)]
             self.grid.insert("", "end", values=padded)
 
+    def _db_process_error(self, option: str = "Selected option") -> None:
+        messagebox.showerror("DB Process Error", f"{option} requires the DB process and is not available in this replica.")
+
     def _noop(self) -> None:
-        messagebox.showinfo("SPC", "This replica focuses on the SPC backend Excel workflow.")
+        self._db_process_error()
 
 
 if __name__ == "__main__":

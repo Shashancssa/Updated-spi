@@ -23,3 +23,13 @@ You have two options:
    - After that, **DefectSPC** / **SPC Excel** opens that linked file directly without opening a folder or asking again.
 
 CSV files are also previewed in the top SPC result grid before the external spreadsheet application opens.
+
+## Editing fields
+
+- Double-click any visible cell in the main result grid to edit values such as **Model**, **StationID**, **TotalBoard**, **YieldRate**, and counts.
+- Double-click any visible cell in the lower condition grid to edit values such as **Tester**, **Model**, **StationID**, **Lotno**, and **Modifie**.
+- Press **Enter** or click away to save the edit; press **Escape** to cancel.
+
+## DB-process-only options
+
+Options that are not part of the Excel workflow, such as **Utilities**, **Other**, **ModelList**, **ListView/Report**, **PcbView**, **Histogram**, and **Defect Chart**, show a **DB Process Error** message because they require the real database process.
